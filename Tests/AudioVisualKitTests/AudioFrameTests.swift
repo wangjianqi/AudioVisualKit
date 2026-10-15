@@ -10,10 +10,22 @@ final class AudioFrameTests: XCTestCase {
         XCTAssertEqual(frame.spectrum, [0])
     }
 
+    func testPCMIsSignedAndInvalidSamplesAreSafe() {
+        let frame = AudioFrame(amplitude: 0.5, history: [-1, 0.2, 2],
+                               samples: [-2, -0.5, .nan, 0.7, 2])
+        XCTAssertEqual(frame.history, [0, 0.2, 1])
+        XCTAssertEqual(frame.samples, [-1, -0.5, 0, 0.7, 1])
+        XCTAssertEqual(AudioFrame.silence.samples, [])
+    }
+
     func testDemoIsDeterministicAndBounded() {
         let first = DemoAudioSignal.frame(at: 1.234)
         XCTAssertEqual(first, DemoAudioSignal.frame(at: 1.234))
         XCTAssertEqual(first.spectrum.count, 32)
+        XCTAssertEqual(first.history.count, 64)
+        XCTAssertEqual(first.samples.count, 256)
+        XCTAssertTrue(first.samples.contains { $0 < 0 })
+        XCTAssertTrue(first.samples.contains { $0 > 0 })
         XCTAssertEqual(first.levels.count, 64)
         XCTAssertTrue(first.spectrum.allSatisfy { $0 >= 0 && $0 <= 1 })
     }
@@ -23,8 +35,7 @@ final class AudioFrameTests: XCTestCase {
         XCTAssertEqual(Set(AudioVisualizationStyle.allCases.map(\.id)).count, 24)
     }
 
-    func testExpandedGalleryHasEightNewStyles() {
-        XCTAssertEqual(AudioVisualizationStyle.allCases.filter(\.isNew).count, 8)
+    func testAllStylesHaveStableGroupMetadata() {
         XCTAssertEqual(Set(AudioVisualizationStyle.allCases.map(\.group)),
                        Set(["Waveforms", "Flow", "Spectrum", "Ambient"]))
         for style in AudioVisualizationStyle.allCases {
@@ -39,6 +50,8 @@ final class AudioFrameTests: XCTestCase {
             XCTAssertTrue((0...1).contains(frame.amplitude))
             XCTAssertTrue(frame.levels.allSatisfy { (0...1).contains($0) })
             XCTAssertTrue(frame.spectrum.allSatisfy { (0...1).contains($0) })
+            XCTAssertTrue(frame.history.allSatisfy { (0...1).contains($0) })
+            XCTAssertTrue(frame.samples.allSatisfy { (-1...1).contains($0) })
         }
     }
 }

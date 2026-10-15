@@ -16,16 +16,36 @@ extension AudioPainter {
         context.fill(Path(ellipseIn: CGRect(x: center.x - base, y: center.y - base, width: base * 2, height: base * 2)), with: .color(color.opacity(0.65)))
     }
 
+    /// Pulsing energy core with audio-modulated orbital contours and luminous lobes.
     func orb() {
-        let radius = unit * (0.16 + amp * 0.12)
-        let outer = radius * 1.65
-        let bounds = CGRect(x: center.x - outer, y: center.y - outer, width: outer * 2, height: outer * 2)
-        context.fill(Path(ellipseIn: bounds), with: .radialGradient(Gradient(colors: [color.opacity(0.42), secondary.opacity(0.19), .clear]), center: center, startRadius: 0, endRadius: outer))
-        let core = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
-        context.fill(Path(ellipseIn: core), with: .radialGradient(Gradient(colors: [color.opacity(0.96), color.opacity(0.43)]), center: CGPoint(x: center.x - radius * 0.3, y: center.y - radius * 0.4), startRadius: 1, endRadius: radius * 1.65))
-        for i in 0..<3 {
-            let r = radius + CGFloat(i + 1) * unit * 0.055 + sin(t * 1.5 + CGFloat(i)) * unit * 0.008
-            context.stroke(Path(ellipseIn: CGRect(x: center.x-r, y: center.y-r, width: r*2, height: r*2)), with: .color(secondary.opacity(Double(max(0.09, amp * 0.37)))), lineWidth: 1)
+        let base = unit * (0.15 + amp * 0.07)
+        let aura = base * 2.35
+        let halo = CGRect(x: center.x-aura, y: center.y-aura, width: 2*aura, height: 2*aura)
+        context.fill(Path(ellipseIn: halo), with: .radialGradient(
+            Gradient(colors: [color.opacity(0.33), secondary.opacity(0.13), .clear]),
+            center: center, startRadius: 0, endRadius: aura))
+        let coreRadius = base * (0.78 + 0.06 * sin(t * 2.8))
+        let core = CGRect(x: center.x-coreRadius, y: center.y-coreRadius,
+                          width: 2*coreRadius, height: 2*coreRadius)
+        context.fill(Path(ellipseIn: core), with: .radialGradient(
+            Gradient(colors: [color.opacity(0.92), color.opacity(0.3), secondary.opacity(0.08)]),
+            center: CGPoint(x: center.x-coreRadius*0.25, y: center.y-coreRadius*0.3),
+            startRadius: 0, endRadius: coreRadius*1.4))
+        for contour in 0..<4 {
+            let segments = 120
+            var path = Path()
+            let baseRadius = base * (1.15 + CGFloat(contour) * 0.23)
+            for i in 0...segments {
+                let theta = CGFloat(i) / CGFloat(segments) * 2 * .pi
+                let fluctuation = sin(theta * CGFloat(6 + contour * 2) - t * (1.9 + CGFloat(contour)*0.2))
+                    * base * (0.045 + amp * 0.19)
+                let radius = baseRadius + fluctuation
+                let point = CGPoint(x: center.x + cos(theta)*radius, y: center.y + sin(theta)*radius)
+                if i == 0 { path.move(to: point) } else { path.addLine(to: point) }
+            }
+            context.stroke(path, with: .color((contour.isMultiple(of: 2) ? color : secondary)
+                .opacity(0.48 - Double(contour)*0.085)),
+                style: StrokeStyle(lineWidth: contour == 0 ? 1.55 : 0.8, lineCap: .round))
         }
     }
 

@@ -64,10 +64,10 @@ struct AudioPainter {
         case .mirroredBars: bars(mirrored: true, capsule: false)
         case .capsuleBars: bars(mirrored: false, capsule: true)
         case .dotWave: dots()
-        case .recordingHistory: bars(mirrored: false, capsule: true, history: true)
+        case .recordingHistory: recordingHistory()
         case .sineWave: waves(layers: 1)
         case .layeredWaves: waves(layers: 3)
-        case .siriFlow: waves(layers: 5)
+        case .siriFlow: siriFlow()
         case .ribbon: ribbon()
         case .spectrum: spectrum(mirrored: false)
         case .mirroredSpectrum: spectrum(mirrored: true)
@@ -97,6 +97,24 @@ struct AudioPainter {
         let second = min(first + 1, values.count - 1)
         let f = position - CGFloat(first)
         return CGFloat(values[first]) * (1 - f) + CGFloat(values[second]) * f
+    }
+
+    func historySample(_ index: Int, of total: Int) -> CGFloat {
+        let values = frame.history.isEmpty ? frame.levels : frame.history
+        guard !values.isEmpty else { return amp * 0.5 }
+        let p = CGFloat(index) / CGFloat(max(1, total - 1)) * CGFloat(values.count - 1)
+        let lo = min(Int(p), values.count - 1)
+        let hi = min(lo + 1, values.count - 1)
+        return CGFloat(values[lo]) * (1 - (p - CGFloat(lo))) + CGFloat(values[hi]) * (p - CGFloat(lo))
+    }
+
+    func pcmSample(_ index: Int, of total: Int) -> CGFloat {
+        let values = frame.samples
+        guard !values.isEmpty else { return 0 }
+        let p = CGFloat(index) / CGFloat(max(1, total - 1)) * CGFloat(values.count - 1)
+        let lo = min(Int(p), values.count - 1)
+        let hi = min(lo + 1, values.count - 1)
+        return CGFloat(values[lo]) * (1 - (p - CGFloat(lo))) + CGFloat(values[hi]) * (p - CGFloat(lo))
     }
 
     func capsule(_ rect: CGRect, tint: Color) {

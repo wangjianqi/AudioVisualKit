@@ -41,7 +41,7 @@ let frame = AudioFrame(amplitude: 0, levels: envelope)
 AudioVisualizer(style: .recordingHistory, frame: frame)
 ```
 
-This is a waveform history. **It is not FFT**. Use an existing audio player's PCM tap if your app needs real-time `spectrum` during playback.
+This older `amplitudes` method returns an envelope only. For playback-aligned FFT and true PCM, call `AudioFileWaveform.analyze(url:)` on a background task and pass `analysis.frame(at: player.currentTime)` to the renderer. Existing audio players may instead supply their own FFT/PCM frames.
 
 ## 4. Choosing a style
 
@@ -54,3 +54,15 @@ This is a waveform history. **It is not FFT**. Use an existing audio player's PC
 ## 5. Accessibility
 
 Use a meaningful parent accessibility label such as recording status or meter value if the visualization conveys actionable information. The renderer itself already exposes a generic description. Honor Reduced Motion in your host `TimelineView` and provide equivalent textual state when necessary.
+
+## File FFT + true oscilloscope
+
+```swift
+// Run the synchronous file decode on a detached/background executor.
+let analysis = try AudioFileWaveform.analyze(url: fileURL)
+let frame = analysis.frame(at: player.currentTime)
+AudioVisualizer(style: .oscilloscope, frame: frame) // uses signed PCM
+AudioVisualizer(style: .starburst, frame: frame)    // uses FFT bands
+```
+
+`AudioFileAnalysis` bounds the number of stored snapshots to prevent unbounded memory use. A long audio file is still fully decoded for analysis, so expose progress/cancellation in a host app.

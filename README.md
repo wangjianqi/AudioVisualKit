@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Swift](https://img.shields.io/badge/Swift-5.9+-orange.svg)](https://swift.org)
 [![Platforms](https://img.shields.io/badge/Platforms-iOS%2017%20%7C%20macOS%2014-lightgrey.svg)](https://developer.apple.com)
-[![CI](https://github.com/wangjianqi/AudioVisualKit/actions/workflows/ci.yml/badge.svg)](https://github.com/wangjianqi/AudioVisualKit/actions/workflows/ci.yml)
+
 
 **24 audio-reactive SwiftUI visualizations. One Swift Package. No external dependencies.**
 
@@ -21,7 +21,7 @@ A reusable audio visualization toolkit for voice interfaces, recorders, music pl
 
 </div>
 
-> **Development status:** The library and the bundled Demo compile on macOS and for iOS Simulator, and the package test suite passes. Real-device audio capture, frame pacing and power measurements are still outstanding — see [TESTING](Docs/TESTING.md) for what is verified and what is not.
+> **V3 status:** The updated source passes syntax checks and Foundation-model type-checking. The V3 package and Demo have **not** yet been rebuilt in Xcode or validated on an iOS device. See [QA REPORT](Docs/QA_REPORT.md).
 
 ## Features
 
@@ -29,7 +29,7 @@ A reusable audio visualization toolkit for voice interfaces, recorders, music pl
 - **Data-driven:** feed normalized `AudioFrame` data from any engine, recorder, or stream.
 - **SwiftUI:** transparent `Canvas` views with configurable color and density.
 - **Demo modes:** Gallery, Studio, and a dense Minimal view for recording preview GIFs.
-- **Input adapters:** synthetic demonstration signal, an opt-in iOS microphone controller, offline audio file envelope extraction.
+- **Input adapters:** synthetic demonstration signal, an opt-in iOS microphone controller, offline playback-aligned FFT / PCM / envelope extraction.
 - **Zero external packages:** uses SwiftUI, Foundation, AVFoundation, and Accelerate from Apple SDKs.
 - **Supported deployment targets:** iOS 17+ and macOS 14+ for the visualization library. The bundled microphone controller is iOS-only.
 
@@ -37,12 +37,12 @@ A reusable audio visualization toolkit for voice interfaces, recorders, music pl
 
 | Family | Visualizations |
 | --- | --- |
-| Waveforms (6) | Bars, Mirrored Bars, Capsule Bars, Dot Wave, Recording History, **Oscilloscope** |
-| Flow (7) | Sine Wave, Layered Waves, Siri Flow, Ribbon, **Double Helix**, **Aurora Curtain**, **Neon Ribbon** |
-| Spectrum (4) | Spectrum, Mirrored Spectrum, Radial Spectrum, **Starburst** |
-| Ambient (7) | Radial Wave, Pulse Rings, Energy Orb, Particles, **Orbiting Arcs**, **Lotus**, **Vortex** |
+| Waveforms (6) | Bars, Mirrored Bars, Capsule Bars, Dot Wave, Recording History, Oscilloscope |
+| Flow (7) | Sine Wave, Layered Waves, Siri Flow, Ribbon, Double Helix, Aurora Curtain, Neon Ribbon |
+| Spectrum (4) | Spectrum, Mirrored Spectrum, Radial Spectrum, Starburst |
+| Ambient (7) | Radial Wave, Pulse Rings, Energy Orb, Particles, Orbiting Arcs, Lotus, Vortex |
 
-**Bold names** are the 8 styles added after the initial 16. All 16 original styles remain available with unchanged case names.
+All 24 styles are first-class API cases. Original style identifiers are unchanged for source compatibility.
 
 ## Getting started
 
@@ -51,14 +51,14 @@ A reusable audio visualization toolkit for voice interfaces, recorders, music pl
 In Xcode use **File → Add Package Dependencies** and enter:
 
 ```
-https://github.com/wangjianqi/AudioVisualKit.git
+https://github.com/YOUR_ACCOUNT/AudioVisualKit.git
 ```
 
 Or add it to your own `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/wangjianqi/AudioVisualKit.git", from: "1.0.0")
+    .package(url: "https://github.com/YOUR_ACCOUNT/AudioVisualKit.git", from: "1.0.0")
 ]
 ```
 
@@ -110,7 +110,15 @@ let levels = try AudioFileWaveform.amplitudes(url: localURL, sampleCount: 180)
 let visualFrame = AudioFrame(amplitude: 0, levels: levels)
 ```
 
-This extracts an **amplitude envelope**, not a synchronized FFT stream. File mode cannot produce real frequency-band data without an audio playback analysis adapter; spectrum styles will correctly remain at baseline when spectrum is unavailable.
+For playback-aligned FFT and signed PCM, use the V3 analyzer instead (perform it off the main actor):
+
+```swift
+let data = try AudioFileWaveform.analyze(url: localURL)
+let current = data.frame(at: player.currentTime)
+AudioVisualizer(style: .radialSpectrum, frame: current)
+```
+
+`amplitudes` still returns *only* a static amplitude envelope. The new `analyze` API returns bounded timestamped real FFT and PCM snapshots.
 
 ## Run the demo
 
@@ -136,12 +144,14 @@ The script writes `Docs/Assets/minimal-preview.gif` by default; pass a second ar
 
 | API | Purpose |
 | --- | --- |
-| `AudioFrame(amplitude:peak:levels:spectrum:timestamp:)` | Normalized, immutable data snapshot, all values clamped to 0–1 |
-| `AudioVisualizationStyle.allCases` | All 24 styles; `title`, `group`, `isNew` metadata |
+| `AudioFrame(amplitude:peak:levels:spectrum:timestamp:history:samples:)` | Envelope/history/FFT clamped 0–1, PCM clamped -1…1 |
+| `AudioVisualizationStyle.allCases` | All 24 styles; `title` and `group` metadata |
 | `AudioVisualizer(style:frame:color:secondaryColor:density:)` | Stateless SwiftUI renderer |
 | `DemoAudioSignal.frame(at:count:)` | Deterministic preview data |
 | `AudioCaptureController` | Optional iOS AVAudioEngine input adapter |
 | `AudioFileWaveform.amplitudes(url:sampleCount:)` | Offline waveform-envelope extraction |
+| `AudioFileWaveform.analyze(url:)` | Background-callable, bounded real FFT and bipolar PCM timeline |
+| `AudioFileAnalysis.frame(at:)` | Select nearest analyzed frame for playback time |
 
 ## Architecture & validation
 
@@ -151,13 +161,13 @@ The script writes `Docs/Assets/minimal-preview.gif` by default; pass a second ar
 - Demo visuals use a deterministic synthetic signal; audio-reactive does **not** imply microphone access.
 - The sample microphone FFT and its allocations must be profiled using Instruments before production use.
 - `30 FPS TARGET` is a scheduling target, not a measured performance guarantee.
-- **Verified in CI and locally:** `swift build` and `swift test` (5 tests) on macOS, and an Xcode Debug build of the Demo for iOS Simulator. **Not yet verified:** physical-device audio capture, frame pacing, energy and memory. See [TESTING](Docs/TESTING.md).
+- **V3 validation:** Swift syntax and pure-model type-checking completed; this revised V3 has not been built with Xcode or tested on real hardware. Previous V2 build results do not validate the revised sources. See [TESTING](Docs/TESTING.md) and [QA REPORT](Docs/QA_REPORT.md).
 
 ## Contributing and security
 
 Pull requests welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md).
 
-The package test suite runs in GitHub Actions on every push and pull request:
+To validate the package locally on macOS using Xcode command-line tools:
 
 ```bash
 swift build
@@ -167,3 +177,20 @@ swift test
 ## License
 
 [MIT](LICENSE). Art and icons bundled in this repository may be redistributed under the same license by this project's contributors; please confirm provenance/rights before replacing them with third-party assets.
+
+## V3 accuracy and data sources
+
+The 24 visualizations are driven by four independent data channels: `levels` (amplitude envelope), `history` (oldest → newest), `spectrum` (real FFT bands), and `samples` (signed PCM). Use `AudioFrame(...)` to bridge an existing recording engine. For file playback:
+
+```swift
+// Perform file analysis on a background task, not on the main actor.
+let analysis = try AudioFileWaveform.analyze(url: fileURL)
+let current = analysis.frame(at: playbackTime)
+AudioVisualizer(style: .radialSpectrum, frame: current)
+```
+
+Replace `YOUR_ACCOUNT` with your actual GitHub username before publishing. There are no GitHub Actions workflows in this repository.
+
+The Demo's Minimal grid deliberately uses complete synthetic Demo data even if Studio previously selected a microphone or a file. Entering Minimal stops live audio capture to avoid hidden microphone use. Source-compatible `AudioFrame` initialization is preserved; optional `history` and `samples` have default `[]` values.
+
+**Publication status:** V3 code audit and parser checks finished. iOS SDK build, simulator rendering, real-time audio and long-file acceptance still require Xcode / a physical device; do not represent them as verified.

@@ -56,6 +56,43 @@ final class AudioFileWaveformTests: XCTestCase {
         XCTAssertThrowsError(try AudioFileWaveform.amplitudes(url: url))
     }
 
+    func testOfflineFFTAndPCMFollowPlaybackTime() throws {
+        let url = try writeSineWav(samplesPerCycle: 8, cycles: 8000)
+        let analysis = try AudioFileWaveform.analyze(url: url, sampleCount: 64,
+                                                     snapshotsPerSecond: 30, maximumSnapshots: 100)
+        XCTAssertEqual(analysis.levels.count, 64)
+        XCTAssertGreaterThan(analysis.duration, 0)
+        XCTAssertFalse(analysis.snapshots.isEmpty)
+        let early = analysis.frame(at: analysis.duration * 0.25)
+        XCTAssertEqual(early.spectrum.count, 32)
+        XCTAssertGreaterThan(early.spectrum.max() ?? 0, 0)
+        XCTAssertTrue(early.samples.contains { $0 > 0 })
+        XCTAssertTrue(early.samples.contains { $0 < 0 })
+        XCTAssertEqual(early.history.count, 64)
+        let late = analysis.frame(at: analysis.duration * 0.85)
+        XCTAssertLessThan(late.amplitude, early.amplitude)
+    }
+
+    func testSilentFFTDoesNotInventFrequencyData() throws {
+        let url = try writeWav(samples: Array(repeating: 0, count: 8192))
+        let analysis = try AudioFileWaveform.analyze(url: url)
+        XCTAssertFalse(analysis.snapshots.isEmpty)
+        for snapshot in analysis.snapshots {
+            XCTAssertEqual(snapshot.spectrum.count, 32)
+            XCTAssertTrue(snapshot.spectrum.allSatisfy { $0 == 0 })
+            XCTAssertTrue(snapshot.samples.allSatisfy { $0 == 0 })
+        }
+    }
+
+    func testTimeIndexedSnapshotsAndHistoryAreClamped() {
+        let quiet = AudioFrame(amplitude: 0.1, spectrum: [0.1], timestamp: 0, samples: [-0.1, 0.1])
+        let loud = AudioFrame(amplitude: 0.9, spectrum: [0.9], timestamp: 2, samples: [-0.9, 0.9])
+        let data = AudioFileAnalysis(duration: 2, levels: [0, 0.4, 0.9, 0.2], snapshots: [quiet, loud])
+        XCTAssertEqual(data.frame(at: -5).amplitude, 0.1)
+        XCTAssertEqual(data.frame(at: 200).amplitude, 0.9)
+        XCTAssertEqual(data.frame(at: 200).history.last, 0.2)
+    }
+
     // MARK: - Helpers
 
     /// Writes a 16-bit PCM WAV: loud sine for the first half, silence afterwards.

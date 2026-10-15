@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Swift](https://img.shields.io/badge/Swift-5.9+-orange.svg)](https://swift.org)
 [![Platforms](https://img.shields.io/badge/Platforms-iOS%2017%20%7C%20macOS%2014-lightgrey.svg)](https://developer.apple.com)
-[![CI](https://github.com/wangjianqi/AudioVisualKit/actions/workflows/ci.yml/badge.svg)](https://github.com/wangjianqi/AudioVisualKit/actions/workflows/ci.yml)
+
 
 **24 种 SwiftUI 声音可视化效果。原生 SPM，零第三方依赖。**
 
@@ -17,7 +17,7 @@
 *上图为品牌宣传素材，并非应用实际运行截图。*
 </div>
 
-> **状态声明：** 库与 Demo 已通过 macOS 编译、iOS 模拟器编译，包测试全部通过。真机录音、帧率与功耗尚未实测，详见[测试清单](Docs/TESTING.md)。
+> **V3 状态：** 已完成语法检查和 Foundation 模型类型检查。V3 新代码尚未通过 Xcode/iOS SDK 编译和真机验收，不能将旧版的测试结果视为新版结果。详见[QA 报告](Docs/QA_REPORT.md)。
 
 ## 包含内容
 
@@ -28,9 +28,9 @@
 - **Demo / Microphone / Audio File**：模拟数据、实时麦克风和本地文件波形。
 - **SwiftUI Canvas**：所有组件背景透明，业务工程提供 `AudioFrame`，组件不自动启动计时器或录音。
 
-## 新增 8 种效果
+## 进阶可视化效果
 
-| 分类 | 新增效果 | 特点 |
+| 分类 | 效果 | 特点 |
 | --- | --- | --- |
 | Waveforms | Oscilloscope | 随声音起伏的示波器曲线 |
 | Flow | Double Helix | 双股螺旋曲线与连接线 |
@@ -46,10 +46,10 @@
 在其他工程中通过 **Xcode → File → Add Package Dependencies** 添加：
 
 ```
-https://github.com/wangjianqi/AudioVisualKit.git
+https://github.com/YOUR_ACCOUNT/AudioVisualKit.git
 ```
 
-或在 `Package.swift` 中声明依赖（`from: "1.0.0"` 起）。本地开发可直接用 **Add Local…** 添加本目录，Demo 工程已通过本地 Swift Package 引用根目录 `Package.swift`，无需联网。
+请将 `YOUR_ACCOUNT` 替换为实际 GitHub 用户名，并在发布可用的版本 Tag 后使用 `from:` 锁定发行版本。本地开发可直接用 **Add Local…** 添加本目录，Demo 工程已通过本地 Swift Package 引用根目录 `Package.swift`，无需联网。
 
 ```swift
 import AudioVisualKit
@@ -68,7 +68,7 @@ AudioVisualizer(
 
 录音需要 `NSMicrophoneUsageDescription`。如果已有录音引擎，建议**复用现有 `AVAudioEngine` 并转换成 `AudioFrame`**，不要启动第二套录音会话。
 
-本地音频文件目前只提取振幅包络，不会自动生成实时 FFT 频谱。见 [使用示例](Docs/RECIPES.md) 和 [测试清单](Docs/TESTING.md)。
+本地文件现在支持 `AudioFileWaveform.analyze(url:)` 在后台分析实际 FFT 频段、PCM 与振幅包络，随后通过 `AudioFileAnalysis.frame(at:)` 按播放器的当前时间取帧。旧的 `amplitudes(url:)` 仍只提取振幅包络。见 [使用示例](Docs/RECIPES.md) 和 [测试清单](Docs/TESTING.md)。
 
 ## 运行 Demo
 
@@ -81,7 +81,7 @@ swift build
 swift test
 ```
 
-CI（GitHub Actions）在每次 push 与 PR 时执行同样命令。
+工程默认**不包含 GitHub Actions 工作流**，请先在自己的 macOS/Xcode 环境中验证。
 
 ## 待完成验收
 
@@ -92,3 +92,9 @@ CI（GitHub Actions）在每次 push 与 PR 时执行同样命令。
 - [ ] 发布 Release Notes
 
 其他材料：`LICENSE`、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`、`SECURITY.md`、`CHANGELOG.md`。
+
+## V3 数据与修复说明
+
+现在 `AudioFrame` 区分四种输入：`levels`（波形包络）、`history`（时间递增的历史音量）、`spectrum`（实际 FFT 频段）与 `samples`（有符号 PCM）。其中示波器不再通过合成正弦波模拟真实 PCM。音频文件模式会在后台预分析，获得随播放时间变化的 FFT 与 PCM 快照。Minimal 模式固定使用完整模拟数据，并在进入时停止麦克风。已移除所有 `NEW` 徽标。
+
+**验证说明：** 本次新版 V3 已完成 Swift 语法及纯模型类型检查，但还没有在当前环境中执行 Xcode/iOS SDK 编译和真机测试；以前版本的测试成功不等于本次新版已通过。详见 `Docs/QA_REPORT.md` 与 `Docs/TESTING.md`。

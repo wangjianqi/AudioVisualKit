@@ -1,50 +1,68 @@
-# Release acceptance checklist
+# AudioVisualKit — Release acceptance (V3)
 
-**Current status:** The package builds and its tests pass on macOS (Swift 6.4 toolchain), and the Demo app builds for iOS Simulator with Xcode 27.1 — zero build warnings. What remains unverified is real-device audio capture, frame pacing, energy and memory.
+**Important:** V3 has not yet been compiled or executed with the Apple iOS SDK in the current environment. Previous build results from V2 must not be represented as verification of V3. Swift source syntax and Foundation-only model type-checking are verified; see `Docs/QA_REPORT.md` for detail.
 
-## Build and packaging
+## Package and Xcode
 
-- [x] `swift build` on macOS
-- [x] `swift test` on macOS (5 tests, 0 failures)
-- [x] Xcode 27.1 Debug build of `AudioVisualKitDemo` for `generic/platform=iOS Simulator`
-- [ ] Release configuration build for iPhone simulator
-- [ ] Build the package and Demo on a physical iPhone
-- [ ] Confirm the Demo App icon and top-left BrandMark render on device
-- [ ] Confirm no stale personal development team or signing credentials are committed
-- [ ] Confirm package can be added to a clean app as a local package and as a remote SPM dependency
+- [ ] `swift build` / `swift test` on macOS 14+ with Xcode (full suite; do not reuse V2 test counts).
+- [ ] Build `Demo/AudioVisualKitDemo.xcodeproj` against an iPhone simulator (Debug and Release).
+- [ ] Install and test on a physical iPhone; check current signing settings are not personal.
+- [ ] Confirm app icon and brand image are rendered correctly.
+- [ ] Import into a clean application as both local and remote Swift Package.
 
-## Visual correctness
+## 24-style visual acceptance
 
-- [ ] Validate all 24 effect names and groups; none are blank or truncated.
-- [ ] Verify `Ribbon` has 3 independent translucent layers with no sharp diamond seam.
-- [ ] Validate eight additions individually at low/high amplitude and with spectrum present/absent.
-- [ ] Check `.silence`, zero-size host frames, different aspect ratios, and iPad layout.
-- [ ] Set Density 16/48/96, Intensity 0.2/1.0/2.0, and each Color swatch.
-- [ ] Check Gallery → Studio navigation, auto-scroll to selected style, and Copy Code button.
-- [ ] Confirm Minimal grid shows 24 styles and its pause/play control works.
-- [ ] Test with Reduce Motion enabled, light/dark device environment, and large Dynamic Type.
+- [ ] **01 Bars:** square vertical bars grow from bottom baseline.
+- [ ] **02 Mirrored Bars:** symmetric rectangular bars grow up/down from center.
+- [ ] **03 Capsule Bars:** spaced round-ended pillars float at center.
+- [ ] **04 Dot Wave:** one travelling dotted curve, not a stationary ellipse.
+- [ ] **05 Recording History:** oldest on left/newest on right; right-side playhead, history scrolls.
+- [ ] **06 Sine Wave:** one continuous signed smooth curve.
+- [ ] **07 Layered Waves:** three differentiated phase layers.
+- [ ] **08 Siri Flow:** central energy ribbon with independent flowing lines, distinct from 07.
+- [ ] **09 Ribbon:** three closed translucent flowing sheets with no seams.
+- [ ] **10 Spectrum:** bar heights visibly respond to supplied FFT bins.
+- [ ] **11 Mirrored Spectrum:** spectrum heights extend above/below center.
+- [ ] **12 Radial Spectrum:** live FFT changes radial spoke length.
+- [ ] **13 Radial Wave:** coherent audio-reactive circular waveform.
+- [ ] **14 Pulse Rings:** outward expansion & fading.
+- [ ] **15 Energy Orb:** inner light plus at least four uneven responding contours.
+- [ ] **16 Particles:** discrete particles with volume-reactive radius.
+- [ ] **17 Oscilloscope:** actual positive/negative PCM; empty PCM yields just baseline.
+- [ ] **18 Double Helix:** strands and rungs, visible crossings.
+- [ ] **19 Aurora Curtain:** translucent descending vertical strips, not mountains.
+- [ ] **20 Neon Ribbon:** prominent bright thin line plus restrained bloom.
+- [ ] **21 Starburst:** FFT lengthens fine sunburst rays, not a solid disk.
+- [ ] **22 Orbiting Arcs:** distinct rotating arcs and endpoint markers.
+- [ ] **23 Lotus:** recognizable petal geometry with soft opacity.
+- [ ] **24 Vortex:** spiral strands are identifiable and animate evenly.
 
-## Audio and lifecycle
+## Data source and lifecycle
 
-- [ ] Microphone: allow permission, deny permission, repeated start/stop, background/foreground.
-- [ ] Audio file: import supported format, play/pause, and test non-file or corrupt input.
-- [ ] No FFT fabricated for file playback: spectrum remains at baseline until an FFT adapter is added.
-- [ ] Verify audio session interactions with background playback / other apps.
-- [ ] Observe memory, CPU, and power usage for at least 10 continuous minutes.
+- [ ] Demo source produces non-empty history, frequency bins and signed PCM.
+- [ ] Minimal always uses Demo signal even after switching sources in Studio.
+- [ ] Minimal entering stops microphone and pauses file; returning to Studio can resume mic.
+- [ ] Gallery, Studio: microphone permission approve/deny and repeated start/stop.
+- [ ] Import a real WAV / M4A; loading must not freeze the UI; no stale imports overriding later ones.
+- [ ] File FFT visualizers react to playback progression, not to static amplitude bins.
+- [ ] The oscilloscope displays actual signed file samples, not synthetic traces.
+- [ ] Test silence, corrupted input, huge (>1 hour) file, repeated import, background interruption.
+- [ ] Verify no leaked temporary files on cancellation, error and scene dismissal.
+- [ ] Verify Reduced Motion stops Demo animation and audio hardware remains off without permission.
+- [ ] No `NEW` labels in any Demo mode.
 
-## Measurement (record actual values before Release)
+## Performance (targets, not measured results)
 
-| Target | Device | Measurement | Status |
-| --- | --- | --- | --- |
-| Dense Minimal gallery ~30 FPS | iPhone 14 Pro+ | Instruments Animation Hitches | Not measured |
-| Audio callback CPU and dropped samples | physical iPhone | Time Profiler + signposts | Not measured |
-| Wake/restart after interruption | physical iPhone | manual test | Not tested |
-| Memory during 10-minute gallery loop | physical iPhone | Allocations | Not measured |
+| Target | Instrument | Accept when |
+| --- | --- | --- |
+| 24 effects @ 30 FPS | Animation Hitches / Core Animation | Sustained 30 FPS in Minimal on target phone |
+| Main-thread audio file import | Time Profiler | No long main-thread stall while scanning file |
+| Capture CPU and drops | Instruments + microphone | No sustained underruns or UI jank |
+| Ten-minute preview | Allocations + Energy Log | Stable memory and acceptable battery draw |
 
-## Github presentation
+## GitHub readiness
 
-- [ ] Record **real** Minimal-mode screen video and generate GIF with `Scripts/make-gif.sh`.
-- [ ] Capture actual Studio/Gallery screenshots; keep generated design illustration labeled as concept.
-- [x] Check logo contrast at tiny icon sizes; verify no transparent pixels in App Store icon. *(AppIcon.png is 1024×1024 RGB, opaque)*
-- [x] Repository description and topics updated to 24 visualizations.
-- [ ] Create a tagged release with notes drawn from `CHANGELOG.md`.
+- [ ] Replace `Docs/Assets/studio-concept.png` with a real Demo screenshot if claiming it is an actual capture.
+- [ ] Record an authentic Minimal mode MP4 and run `Scripts/make-gif.sh`.
+- [ ] Ensure README, CHANGELOG and Version tags accurately report *tested* functionality.
+- [ ] No CI or GitHub Actions are included by default.

@@ -43,15 +43,6 @@ public enum AudioVisualizationStyle: String, CaseIterable, Identifiable, Sendabl
         }
     }
 
-    /// True for the eight additional styles introduced in the expanded gallery.
-    public var isNew: Bool {
-        switch self {
-        case .oscilloscope, .doubleHelix, .auroraCurtain, .neonRibbon,
-             .starburst, .orbitingArcs, .lotus, .vortex: true
-        default: false
-        }
-    }
-
     public var group: String {
         switch self {
         case .bars, .mirroredBars, .capsuleBars, .dotWave, .recordingHistory, .oscilloscope: "Waveforms"

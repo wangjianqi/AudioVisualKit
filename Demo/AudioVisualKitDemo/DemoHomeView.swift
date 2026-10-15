@@ -26,7 +26,10 @@ struct DemoHomeView: View {
     @State private var intensity: Double = 1.0
     @State private var tint = Color.white
     @State private var showingFilePicker = false
-    @State private var fileAmplitudes: [Float] = []
+    @State private var fileAnalysis: AudioFileAnalysis?
+    @State private var isAnalyzingFile = false
+    @State private var fileImportTask: Task<Void, Never>?
+    @State private var importGeneration = UUID()
     @State private var audioPlayer: AVAudioPlayer?
     @State private var importedTempURL: URL?
     @State private var fileTitle: String = "Select audio file"
@@ -45,8 +48,10 @@ struct DemoHomeView: View {
     var body: some View {
         GeometryReader { geometry in
             TimelineView(.animation(minimumInterval: 1.0 / 30.0,
-                                    paused: (reduceMotion || isDemoPaused) && source == .demo)) { clock in
-                let frame = presentationFrame(at: clock.date.timeIntervalSinceReferenceDate)
+                                    paused: (reduceMotion || isDemoPaused) && (display == .minimal || source == .demo))) { clock in
+                let frame = display == .minimal
+                    ? scaledFrame(DemoAudioSignal.frame(at: reduceMotion || isDemoPaused ? 1.1 : clock.date.timeIntervalSinceReferenceDate))
+                    : presentationFrame(at: clock.date.timeIntervalSinceReferenceDate)
                 ScrollView {
                     VStack(alignment: .leading, spacing: display == .minimal ? 12 : 20) {
                         if display != .minimal { header }
@@ -69,7 +74,7 @@ struct DemoHomeView: View {
         }
         .background(background.ignoresSafeArea())
         .fileImporter(isPresented: $showingFilePicker, allowedContentTypes: [.audio]) { result in
-            do { try importAudio(result.get()) }
+            do { importAudio(try result.get()) }
             catch { importError = error.localizedDescription }
         }
         .alert("Audio import failed", isPresented: Binding(
@@ -81,16 +86,25 @@ struct DemoHomeView: View {
             Text(importError ?? "Unknown error")
         }
         .onChange(of: source) { _, value in changeSource(value) }
+        .onChange(of: display) { old, next in
+            if next == .minimal {
+                microphone.stop()
+                audioPlayer?.pause()
+            } else if old == .minimal && source == .microphone && scenePhase == .active {
+                startMicrophone()
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
                 microphone.stop()
                 audioPlayer?.pause()
-            } else if source == .microphone {
+            } else if source == .microphone && display != .minimal {
                 startMicrophone()
             }
         }
         .onDisappear {
             microphone.stop()
+            fileImportTask?.cancel()
             audioPlayer?.stop()
             if let importedTempURL { try? FileManager.default.removeItem(at: importedTempURL) }
         }
@@ -218,18 +232,9 @@ struct DemoHomeView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 Spacer(minLength: 1)
-                if style.isNew {
-                    Text("NEW")
-                        .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 3)
-                        .background(.white, in: Capsule())
-                } else {
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.gray)
-                }
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.gray)
             }
         }
         .padding(13)
@@ -279,7 +284,7 @@ struct DemoHomeView: View {
                     .background(surface, in: RoundedRectangle(cornerRadius: 12))
                 }
             }
-            Text("DEMO SIGNAL · ONE SHARED CLOCK · NO MIC REQUIRED")
+            Text("DEMO SIGNAL · FULL SPECTRUM + PCM · ONE CLOCK")
                 .font(.system(size: 8, weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.42))
                 .frame(maxWidth: .infinity)
@@ -341,14 +346,6 @@ struct DemoHomeView: View {
                         Text(currentStyle.title)
                             .font(.system(size: 26, weight: .semibold, design: .rounded))
                             .tracking(-0.5)
-                        if currentStyle.isNew {
-                            Text("NEW")
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                .foregroundStyle(.black)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 4)
-                                .background(.white, in: Capsule())
-                        }
                     }
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -416,13 +413,7 @@ struct DemoHomeView: View {
                     .accessibilityAddTraits(tint == option ? .isSelected : [])
                 }
             }
-            if source == .file {
-                Text("File mode uses the waveform envelope. Frequency-spectrum styles need a playback FFT adapter.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.white.opacity(0.45))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                fileControl
-            }
+            if source == .file { fileControl }
         }
         .font(.system(size: 12, weight: .medium))
         .padding(18)
@@ -463,6 +454,14 @@ struct DemoHomeView: View {
                     .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
+            if isAnalyzingFile {
+                HStack(spacing: 8) {
+                    ProgressView().tint(.white)
+                    Text("Analyzing audio and FFT off the main thread…")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+            }
             if let player = audioPlayer {
                 HStack {
                     Button {
@@ -514,26 +513,28 @@ struct DemoHomeView: View {
         case .microphone:
             result = microphone.frame
         case .file:
-            guard !fileAmplitudes.isEmpty else { return .silence }
-            let progress = audioPlayer.map { $0.duration > 0 ? $0.currentTime / $0.duration : 0 } ?? 0
-            let idx = min(fileAmplitudes.count - 1,
-                          max(0, Int(progress * Double(fileAmplitudes.count))))
-            result = AudioFrame(amplitude: fileAmplitudes[idx],
-                                levels: fileAmplitudes, timestamp: time)
+            guard let fileAnalysis else { return .silence }
+            result = fileAnalysis.frame(at: audioPlayer?.currentTime ?? 0)
         }
-        let m = Float(intensity)
-        return AudioFrame(amplitude: min(1, result.amplitude * m),
-                          peak: min(1, result.peak * m),
-                          levels: result.levels.map { min(1, $0 * m) },
-                          spectrum: result.spectrum.map { min(1, $0 * m) },
-                          timestamp: result.timestamp)
+        return scaledFrame(result)
+    }
+
+    private func scaledFrame(_ frame: AudioFrame) -> AudioFrame {
+        let value = Float(intensity)
+        return AudioFrame(amplitude: min(1, frame.amplitude * value),
+                          peak: min(1, frame.peak * value),
+                          levels: frame.levels.map { min(1, $0 * value) },
+                          spectrum: frame.spectrum.map { min(1, $0 * value) },
+                          timestamp: frame.timestamp,
+                          history: frame.history.map { min(1, $0 * value) },
+                          samples: frame.samples.map { max(-1, min(1, $0 * value)) })
     }
 
     private func changeSource(_ option: SignalSource) {
         if option != .microphone { microphone.stop() }
-        if option != .file { audioPlayer?.stop() }
-        if option == .microphone { startMicrophone() }
-        if option == .file && fileAmplitudes.isEmpty { showingFilePicker = true }
+        if option != .file { audioPlayer?.pause() }
+        if option == .microphone && display != .minimal && scenePhase == .active { startMicrophone() }
+        if option == .file && fileAnalysis == nil && !isAnalyzingFile { showingFilePicker = true }
     }
 
     private func startMicrophone() {
@@ -548,23 +549,55 @@ struct DemoHomeView: View {
         }
     }
 
-    private func importAudio(_ url: URL) throws {
+    /// All expensive security-scoped copying and FFT decoding happens in a worker.
+    /// Generation checks prevent a slower earlier file from overwriting a newer import.
+    private func importAudio(_ url: URL) {
+        fileImportTask?.cancel()
+        let generation = UUID()
+        importGeneration = generation
+        isAnalyzingFile = true
+        fileTitle = url.lastPathComponent
+        fileImportTask = Task {
+            do {
+                let worker = Task.detached(priority: .userInitiated) {
+                    try Self.analyzeImport(url)
+                }
+                let prepared = try await withTaskCancellationHandler {
+                    try await worker.value
+                } onCancel: {
+                    worker.cancel()
+                }
+                guard generation == importGeneration, !Task.isCancelled else {
+                    try? FileManager.default.removeItem(at: prepared.url)
+                    return
+                }
+                let player = try AVAudioPlayer(contentsOf: prepared.url)
+                player.prepareToPlay()
+                audioPlayer?.stop()
+                if let importedTempURL { try? FileManager.default.removeItem(at: importedTempURL) }
+                importedTempURL = prepared.url
+                fileAnalysis = prepared.analysis
+                audioPlayer = player
+                isAnalyzingFile = false
+            } catch {
+                if generation == importGeneration {
+                    isAnalyzingFile = false
+                    importError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    /// Owns its security-scoped access and always removes partial copies on failure.
+    private nonisolated static func analyzeImport(_ url: URL) throws -> (url: URL, analysis: AudioFileAnalysis) {
         let granted = url.startAccessingSecurityScopedResource()
         defer { if granted { url.stopAccessingSecurityScopedResource() } }
-        let name = url.lastPathComponent
         let temp = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString + "-" + name)
+            .appendingPathComponent(UUID().uuidString + "-" + url.lastPathComponent)
         do {
             try FileManager.default.copyItem(at: url, to: temp)
-            let levels = try AudioFileWaveform.amplitudes(url: temp, sampleCount: 180)
-            let player = try AVAudioPlayer(contentsOf: temp)
-            player.prepareToPlay()
-            audioPlayer?.stop()
-            if let importedTempURL { try? FileManager.default.removeItem(at: importedTempURL) }
-            importedTempURL = temp
-            fileAmplitudes = levels
-            audioPlayer = player
-            fileTitle = name
+            let analysis = try AudioFileWaveform.analyze(url: temp)
+            return (temp, analysis)
         } catch {
             try? FileManager.default.removeItem(at: temp)
             throw error

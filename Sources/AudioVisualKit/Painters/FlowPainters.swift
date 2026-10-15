@@ -66,53 +66,124 @@ extension AudioPainter {
         }
     }
 
+    /// A continuous voice-energy envelope with two travelling bright filaments.
+    /// Unlike `layeredWaves`, energy is centered and each band has its own phase/decay.
+    func siriFlow() {
+        let segments = 180
+        let energy = 0.20 + amp * 0.80
+        for layer in (0..<6).reversed() {
+            let phase = CGFloat(layer) * .pi / 3
+            let frequency = 2.6 + CGFloat(layer % 3) * 0.5
+            let width = layer == 0 ? 2.4 : 1.1
+            var path = Path()
+            for i in 0...segments {
+                let x = CGFloat(i) / CGFloat(segments)
+                let envelope = pow(max(0, sin(x * .pi)), 2.0)
+                let carrier = sin(x * .pi * frequency * 2 - t * (1.4 + CGFloat(layer) * 0.09) + phase)
+                let modulation = cos(x * .pi * 3.2 + t * 0.71 - phase) * 0.35
+                let y = center.y + (carrier + modulation) * h * 0.36 * energy * envelope
+                let point = CGPoint(x: x*w, y: y)
+                if i == 0 { path.move(to: point) } else { path.addLine(to: point) }
+            }
+            let tint = layer.isMultiple(of: 2) ? color : secondary
+            if layer == 0 {
+                context.stroke(path, with: .color(color.opacity(0.12)), style: StrokeStyle(lineWidth: 9, lineCap: .round))
+            }
+            context.stroke(path, with: .color(tint.opacity(layer == 0 ? 1 : 0.24 + Double(5 - layer) * 0.09)),
+                           style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
+        }
+        // A fine stationary energy axis anchors the assistant wave near silence.
+        var axis = Path()
+        axis.move(to: CGPoint(x: 0, y: center.y))
+        axis.addLine(to: CGPoint(x: w, y: center.y))
+        context.stroke(axis, with: .color(secondary.opacity(0.16)), lineWidth: 0.7)
+    }
+
+    /// A two-strand helix: the front strand changes with depth and the rungs
+    /// fade at crossings. It remains legible even in the small Minimal cells.
     func doubleHelix() {
-        let n = 130
-        let magnitude = h * (0.15 + amp * 0.19)
+        let n = 150
+        let magnitude = h * (0.13 + amp * 0.23)
+        func point(_ x: CGFloat, phase: CGFloat) -> CGPoint {
+            let envelope = pow(max(0, sin(x * .pi)), 0.65)
+            let theta = x * 5.5 * .pi - t * 1.9 + phase
+            return CGPoint(x: x*w, y: center.y + sin(theta) * magnitude * envelope)
+        }
+        for i in 1..<36 {
+            let x = CGFloat(i) / 36
+            let angle = x * 5.5 * .pi - t * 1.9
+            let a = point(x, phase: 0)
+            let b = point(x, phase: .pi)
+            var rung = Path()
+            rung.move(to: a)
+            rung.addLine(to: b)
+            context.stroke(rung, with: .color(secondary.opacity(0.10 + 0.25 * abs(Double(cos(angle))))), lineWidth: 1)
+        }
+        // Draw behind strand first, then highlight near-facing half of helix.
         for strand in 0..<2 {
             let phase: CGFloat = strand == 0 ? 0 : .pi
             var path = Path()
             for i in 0...n {
                 let x = CGFloat(i) / CGFloat(n)
-                let envelope = pow(max(0, sin(x * .pi)), 0.7)
-                let y = center.y + sin(x * 5.2 * .pi - t * 2.2 + phase) * magnitude * envelope
-                let point = CGPoint(x: w * x, y: y)
-                if i == 0 { path.move(to: point) } else { path.addLine(to: point) }
+                let p = point(x, phase: phase)
+                if i == 0 { path.move(to: p) } else { path.addLine(to: p) }
             }
-            context.stroke(path, with: .color((strand == 0 ? color : secondary).opacity(0.90)),
-                           style: StrokeStyle(lineWidth: strand == 0 ? 2.4 : 1.9, lineCap: .round))
-        }
-        for i in 1..<24 {
-            let x = CGFloat(i) / 24
-            let envelope = pow(max(0, sin(x * .pi)), 0.7)
-            let offset = sin(x * 5.2 * .pi - t * 2.2) * magnitude * envelope
-            var rung = Path()
-            rung.move(to: CGPoint(x: w * x, y: center.y - offset))
-            rung.addLine(to: CGPoint(x: w * x, y: center.y + offset))
-            context.stroke(rung, with: .color(color.opacity(0.10 + Double(amp) * 0.13)), lineWidth: 1)
+            context.stroke(path, with: .color((strand == 0 ? color : secondary).opacity(0.54)),
+                           style: StrokeStyle(lineWidth: 1.55, lineCap: .round))
+            // Short highlights alternate at each twist to convey crossing depth.
+            for turn in 0..<6 {
+                var highlight = Path()
+                for j in 0...24 {
+                    let x = (CGFloat(turn) + CGFloat(j) / 24 * 0.48) / 5.8
+                    let p = point(min(1, x), phase: phase)
+                    if j == 0 { highlight.move(to: p) } else { highlight.addLine(to: p) }
+                }
+                context.stroke(highlight, with: .color(color.opacity(0.55)),
+                               style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
+            }
         }
     }
 
+    /// Translucent vertical aurora curtains rather than solid mountain-shaped sheets.
     func auroraCurtain() {
-        let n = 100
-        for layer in (0..<5).reversed() {
-            let shift = CGFloat(layer) * 0.63
-            let base = h * (0.38 + CGFloat(layer) * 0.035)
-            var path = Path()
-            path.move(to: CGPoint(x: 0, y: h * 0.94))
-            for i in 0...n {
-                let x = CGFloat(i) / CGFloat(n)
-                let envelope = pow(max(0, sin(x * .pi)), 0.85)
-                let y = base + sin(x * 3.7 * .pi - t * 1.2 + shift) * h * (0.1 + amp * 0.16) * envelope
-                    + cos(x * 7.7 * .pi + t * 0.54 + shift) * h * 0.026 * envelope
-                path.addLine(to: CGPoint(x: x * w, y: y))
+        let columns = 32
+        let strength = 0.20 + amp * 0.80
+        for layer in (0..<4).reversed() {
+            let phase = CGFloat(layer) * 0.85
+            let topBase = h * (0.20 + CGFloat(layer) * 0.07)
+            let height = h * (0.34 + amp * 0.25 - CGFloat(layer) * 0.035)
+            // Each strip fades vertically; shifting wave phase imparts curtain-like motion.
+            for column in 0..<columns {
+                let x0 = CGFloat(column) / CGFloat(columns)
+                let x1 = CGFloat(column + 1) / CGFloat(columns)
+                let x = (x0 + x1) * 0.5
+                let envelope = pow(max(0, sin(x * .pi)), 0.55)
+                let rippling = sin(x * 5 * .pi - t * 1.1 + phase) * h * 0.095 * strength
+                    + sin(x * 13 * .pi + t * 0.6 + phase) * h * 0.02
+                let top = topBase + rippling * envelope
+                let bottom = top + height * envelope
+                var strip = Path()
+                strip.move(to: CGPoint(x: x0*w, y: top))
+                strip.addLine(to: CGPoint(x: x1*w, y: top + h * 0.01))
+                strip.addLine(to: CGPoint(x: x1*w, y: bottom))
+                strip.addLine(to: CGPoint(x: x0*w, y: bottom))
+                strip.closeSubpath()
+                let brightness = 0.08 + 0.14 * (1 + cos(x*12 + phase)) * 0.5
+                context.fill(strip, with: .linearGradient(
+                    Gradient(colors: [color.opacity(Double(brightness) + Double(amp)*0.08),
+                                      (layer.isMultiple(of: 2) ? color : secondary).opacity(0.11), .clear]),
+                    startPoint: CGPoint(x: x*w, y: top), endPoint: CGPoint(x: x*w, y: bottom)))
             }
-            path.addLine(to: CGPoint(x: w, y: h * 0.94))
-            path.closeSubpath()
-            context.fill(path, with: .linearGradient(
-                Gradient(colors: [color.opacity(0.04 + Double(amp) * 0.05),
-                                  (layer.isMultiple(of: 2) ? secondary : color).opacity(0.09 + Double(amp) * 0.13), .clear]),
-                startPoint: CGPoint(x: w / 2, y: h * 0.32), endPoint: CGPoint(x: w / 2, y: h * 0.97)))
+            var crest = Path()
+            for i in 0...120 {
+                let x = CGFloat(i) / 120
+                let envelope = pow(max(0, sin(x * .pi)), 0.55)
+                let y = topBase + (sin(x * 5 * .pi - t * 1.1 + phase) * h * 0.095 * strength
+                    + sin(x * 13 * .pi + t * 0.6 + phase) * h * 0.02) * envelope
+                if i == 0 { crest.move(to: CGPoint(x: x*w, y: y)) }
+                else { crest.addLine(to: CGPoint(x: x*w, y: y)) }
+            }
+            context.stroke(crest, with: .color(color.opacity(0.24)), lineWidth: 0.8)
         }
     }
 
