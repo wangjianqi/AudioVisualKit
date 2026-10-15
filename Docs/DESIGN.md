@@ -1,63 +1,61 @@
-# AudioVisualKit · Architecture and Design
+# AudioVisualKit · Rendering and Architecture
 
 ## Goals
 
-- A reusable SwiftUI visual-only library with 16 styles and a single `AudioFrame` contract.
-- A simple iOS microphone input adapter that applications may opt into.
-- An offline audio-file envelope extractor without loading entire files.
-- A showcase with Gallery, Minimal (GIF capture), and Studio (configuration) modes.
-- No forced external dependencies, transparent backgrounds, customizable color and density.
+- 24 audio-reactive SwiftUI styles, compatible with existing 16 style names.
+- Transparent visual layer and a stable immutable `AudioFrame` contract.
+- Optional microphone and offline file-envelope adapters.
+- No third-party runtime dependencies and no timers inside each visualizer.
 
-## Signal flow
+## Frame pipeline
 
-`AVAudioEngine input tap` → fixed 1024-frame copy → UI-side 30 Hz consumption → RMS / FFT → normalized `AudioFrame` → `AudioVisualizer` → `Canvas`.
+`PCM (app-owned AVAudioEngine / sample adapter)` → `RMS, peaks, FFT bins` → normalized `AudioFrame` → `AudioVisualizer` → `SwiftUI Canvas`.
 
-Apps with existing recorders, voice sessions, video capture, or DSP engines should NOT start a second AVAudioEngine. Feed their data into `AudioFrame` directly.
+`DemoAudioSignal` is deterministic; use it for zero-permission animations and screenshot/GIF previews. Sound-reactive visualization is different from a calibrated SPL meter.
 
-All values are normalized to the closed range 0...1. The renderer must not infer frequency content from RMS except as an expressly labeled fallback.
+## Visual styles
 
-## Components
+| Family | Styles | Required signals |
+| --- | --- | --- |
+| Waveforms (6) | bars, mirroredBars, capsuleBars, dotWave, recordingHistory, oscilloscope | levels / amplitude / time |
+| Flow (7) | sineWave, layeredWaves, siriFlow, ribbon, doubleHelix, auroraCurtain, neonRibbon | amplitude / time / levels |
+| Spectrum (4) | spectrum, mirroredSpectrum, radialSpectrum, starburst | spectrum |
+| Ambient (7) | radialWave, pulseRings, energyOrb, particles, orbitingArcs, lotus, vortex | amplitude / time / levels |
 
-| Group | Styles | Input |
-|---|---|---|
-| Waveforms | bars, mirroredBars, capsuleBars, dotWave, recordingHistory | levels |
-| Flow | sineWave, layeredWaves, siriFlow, ribbon | amplitude + time |
-| Spectrum | spectrum, mirroredSpectrum, radialSpectrum | spectrum |
-| Ambient | radialWave, pulseRings, energyOrb, particles | amplitude + time / levels |
+The renderer handles empty signals deterministically. It does not invent FFT frequency bins when absent.
 
-## Demo
+## Drawing discipline
 
-### Gallery
-Two columns of rich transparent preview cards, grouped by four categories. Tap a card to configure it in Studio.
+- Prefer Canvas vector primitives and a shared `TimelineView` schedule.
+- Clamp input analysis and drawing density to avoid out-of-range paths.
+- Use the view's bounds, never hardcode iPhone coordinates.
+- `Ribbon` now uses three opposing-edge translucent sheets with independent phase shifts; it is not just one filled diamond.
+- Each new style must respond to `AudioFrame` changes and must not require network or device permission.
+- Keep animations responsive to `.accessibilityReduceMotion` at the host level. The sample Demo pauses synthetic motion when enabled.
 
-### Minimal
-16 visualizations packed into a 3-column phone grid or 4-column wider grid. One shared `TimelineView` drives them all at up to 30 fps. The demo signal is deterministic and needs no permission. Recommended GIF size: 900 px wide, 8–12 sec, 12–20 fps.
+## Input adapter constraints
 
-### Studio
-Full-size live preview; 16-style selector; density, intensity and color controls; source toggle (Demo/Microphone/Audio File); file playback.
+- The microphone adapter requests permission only when explicitly started.
+- `AVAudioEngine.inputNode.installTap` is a compatibility implementation and should not be duplicated in apps that already own audio capture.
+- The callback uses a fixed-size capture buffer with skip-on-lock-contention, intended as a **demo-grade** adapter rather than a certified real-time DSP subsystem.
+- FFT processing currently occurs downstream from the tap, on the presentation actor, with temporary allocations. For high-throughput use, move DSP to a worker and use bounded transfer of the latest frame.
+- The audio-file adapter extracts **envelope data**, not aligned playback FFT bins. Do not claim that `spectrum` visualizations reflect audio-file frequencies.
 
-## Notes and limitations
+## Demo UI
 
-1. This starter project is source-generated and has not been built with Xcode or device-tested in this environment.
-2. The bundled microphone adapter is best-effort and uses the legacy `installTap` compatibility API. It contains a skip-on-contention preallocated capture window, but it is not a formal certified hard-real-time audio component.
-3. FFT windowing is performed downstream of the audio callback, but its allocation/performance require Instruments verification.
-4. Audio File mode shows truthful file amplitude envelope. A full synchronized decoded spectrum for playback is a separate milestone; it must not be falsely represented as real FFT.
-5. Demo snapshots/GIF should label their source as synthetic demo signal if there is no microphone input.
-6. The demo app has iOS microphone usage text in generated Info.plist. Consumers must provide their own usage description.
-7. Reduced Motion: the demo freezes synthetic motion when system accessibility Reduce Motion is enabled.
-8. The package is licensed MIT. Verify third-party source/image rights before adding assets.
+- Gallery: two-column cards, four groups, `NEW` badge for eight additions.
+- Minimal: 3 columns on phones, 4 on wider layouts, one shared clock and automatic count.
+- Studio: more prominent multi-layer effects, auto-scrolling selected style, controls, source, and copyable sample code.
+- `Docs/Assets/studio-concept.png` is a concept rendering. Replace it with a real simulator screenshot before public release if showing actual UI behavior is important.
 
-## Performance acceptance (targets; not measured)
+## Performance and acceptance
 
-- 16 minimal cells simultaneously: target 30 fps on iPhone 14 Pro or later.
-- Input-to-visual latency: target < 100 ms at 30 Hz, measured by timestamps with Instruments.
-- Idle/background: stop tap and audio engine; avoid updating visualizations in background.
-- CPU, power and dropped-frame thresholds must be measured on real devices.
+These are **targets, not benchmarks**:
 
-## Planned V1.1 improvements
+- Aim for 30 FPS in dense Minimal mode; verify actual frame pacing on devices.
+- Check UI updates and frame rates with Instruments/Animation Hitches, Time Profiler, and Energy Log.
+- Verify app lifecycle: suspend microphone and audio playback when inactive; restore only when appropriate.
+- Measure input-to-presentation latency; do not advertise unmeasured values.
+- Compare brightness / amplitude at silent and loud signal levels. Validate the visual character of every style, not merely whether it moves.
 
-- Switch to the modern `installAudioTap` where minimum SDK/version allows.
-- Playback engine providing time-aligned amplitude and FFT bins, not just file envelope.
-- Strict Swift 6 concurrency pass and Swift Testing/instrumented screenshot tests.
-- Color palette tokens and recorder state transitions with haptics disabled by default.
-- CI builds on iOS simulator; README rendered previews and GIF exports.
+See `Docs/TESTING.md` for reproducible acceptance steps.

@@ -1,106 +1,145 @@
+<div align="center">
+
+<img src="Docs/Assets/logo-mark.png" width="104" alt="AudioVisualKit logo">
+
 # AudioVisualKit
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Swift](https://img.shields.io/badge/Swift-5.9+-orange.svg)
-![Platforms](https://img.shields.io/badge/Platforms-iOS%2017%20%7C%20macOS%2014-lightgrey.svg)
+**24 audio-reactive SwiftUI visualizations. One Swift Package. No external dependencies.**
 
-**16 SwiftUI sound visualizations in one zero-dependency Swift Package.**
+A reusable audio visualization toolkit for voice interfaces, recorders, music players, and interactive experiences.
 
-A transparent and reusable visual layer for voice interfaces, recording apps, audio players and interactive demos.
+[中文说明](README.zh-CN.md) · [Getting Started](#getting-started) · [Effects](#effects) · [Demo](#run-the-demo) · [Contributing](CONTRIBUTING.md)
 
-## Requirements
+<img src="Docs/Assets/hero.png" alt="AudioVisualKit brand illustration showing wave, spectrum and radial effects">
 
-- Swift 5.9+ / Xcode 15+
-- iOS 17+ or macOS 14+
-- No third-party dependencies
+*Brand artwork (not a screenshot of the running application).*
 
-## Run the Demo
+</div>
 
-1. Open `Demo/AudioVisualKitDemo.xcodeproj` in Xcode (recommended Xcode 16+, test with Xcode 27).
-2. Select an iPhone simulator or a connected device.
-3. Run. **Gallery** lists all effects; **Minimal** shows a dense GIF-friendly grid; **Studio** lets you change styles, colors, density and input.
-4. **Demo** mode runs without permissions. **Microphone** mode requests permission and works on a physical device. **Audio File** mode loads a local audio file for waveform preview/playback.
+> **Development status:** This repository is an open-source starter and design implementation, not yet a device-validated release. Source syntax and project structure have been checked, but building the iOS target and performance testing on device are still required.
 
-The Xcode demo refers to this package as a *local Swift Package*. Keep the `Demo` directory inside the package root.
+## Features
 
-## SPM Integration
+- **24 effects:** waveforms, fluid ribbons, music spectrum, generative ambient visuals.
+- **Data-driven:** feed normalized `AudioFrame` data from any engine, recorder, or stream.
+- **SwiftUI:** transparent `Canvas` views with configurable color and density.
+- **Demo modes:** Gallery, Studio, and a dense Minimal view for recording preview GIFs.
+- **Input adapters:** synthetic demonstration signal, an opt-in iOS microphone controller, offline audio file envelope extraction.
+- **Zero external packages:** uses SwiftUI, Foundation, AVFoundation, and Accelerate from Apple SDKs.
+- **Supported deployment targets:** iOS 17+ and macOS 14+ for the visualization library. The bundled microphone controller is iOS-only.
 
-Add the package in Xcode → File → Add Package Dependencies:
+## Effects
 
-```
-https://github.com/wangjianqi/AudioVisualKit.git
-```
+| Family | Visualizations |
+| --- | --- |
+| Waveforms (6) | Bars, Mirrored Bars, Capsule Bars, Dot Wave, Recording History, **Oscilloscope** |
+| Flow (7) | Sine Wave, Layered Waves, Siri Flow, Ribbon, **Double Helix**, **Aurora Curtain**, **Neon Ribbon** |
+| Spectrum (4) | Spectrum, Mirrored Spectrum, Radial Spectrum, **Starburst** |
+| Ambient (7) | Radial Wave, Pulse Rings, Energy Orb, Particles, **Orbiting Arcs**, **Lotus**, **Vortex** |
 
-Then import and use:
+**Bold names** are the 8 styles added in this revision. All 16 original styles remain available with unchanged case names.
+
+## Getting started
+
+### Swift Package Manager
+
+After pushing your fork or publishing this package to GitHub, use **Xcode → File → Add Package Dependencies**, enter *your repository's actual URL*, select a version, and `import AudioVisualKit`.
+
+For local development, add this package using **Add Local…** from Xcode. No remote repository URL is required for the included Demo.
+
+### One visualizer
 
 ```swift
 import AudioVisualKit
+import SwiftUI
 
-AudioVisualizer(
-    style: .siriFlow,
-    frame: DemoAudioSignal.frame(at: Date().timeIntervalSinceReferenceDate),
-    color: .white,
-    density: 48
-)
-.frame(height: 100)
-```
-
-The application owns the frame source and redraw cadence. For example, a gallery uses **one shared** `TimelineView`:
-
-```swift
-TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { time in
-    let signal = DemoAudioSignal.frame(at: time.date.timeIntervalSinceReferenceDate)
-    VStack {
-        AudioVisualizer(style: .siriFlow, frame: signal)
-        AudioVisualizer(style: .radialSpectrum, frame: signal)
+struct Example: View {
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30)) { clock in
+            let audio = DemoAudioSignal.frame(at: clock.date.timeIntervalSinceReferenceDate)
+            AudioVisualizer(style: .neonRibbon,
+                            frame: audio,
+                            color: .white,
+                            secondaryColor: .gray,
+                            density: 48)
+                .frame(height: 140)
+        }
     }
 }
 ```
 
-### Live microphone
+The library view **does not** capture audio or start its own display clock. Multiple views should share their parent timeline, as demonstrated by the Minimal gallery.
 
-On iOS, use `AudioCaptureController` for a simple integrated microphone pipeline:
+### Real-time input
+
+On iOS the optional sample adapter supports live microphone input:
 
 ```swift
-@StateObject private var audio = AudioCaptureController()
+@StateObject private var microphone = AudioCaptureController()
 
 var body: some View {
-    AudioVisualizer(style: .radialSpectrum, frame: audio.frame)
-        .task { try? await audio.start() }
-        .onDisappear { audio.stop() }
+    AudioVisualizer(style: .starburst, frame: microphone.frame)
+        .task { try? await microphone.start() }
+        .onDisappear { microphone.stop() }
 }
 ```
 
-Your target must set `NSMicrophoneUsageDescription`. For existing recording/voice apps, **reuse the existing audio engine** and build your own `AudioFrame` instead of opening an additional microphone tap.
+Set `NSMicrophoneUsageDescription` in your app's Info.plist. For an existing recorder, **do not create a second audio engine**: analyze its buffers and provide an `AudioFrame` directly. See [integration recipes](Docs/RECIPES.md).
 
-### File envelope
+### From an audio file
 
 ```swift
-let values = try AudioFileWaveform.amplitudes(url: fileURL, sampleCount: 180)
-let frame = AudioFrame(amplitude: 0, levels: values)
+let levels = try AudioFileWaveform.amplitudes(url: localURL, sampleCount: 180)
+let visualFrame = AudioFrame(amplitude: 0, levels: levels)
 ```
 
-## Architecture and QA
+This extracts an **amplitude envelope**, not a synchronized FFT stream. File mode cannot produce real frequency-band data without an audio playback analysis adapter; spectrum styles will correctly remain at baseline when spectrum is unavailable.
 
-- `AudioFrame` = immutable normalized input contract.
-- `AudioVisualizer` = 16 vector styles in SwiftUI `Canvas`.
-- `DemoAudioSignal` = deterministic simulator, no permission.
-- `AudioCaptureController` = optional iOS AVAudioEngine input adapter.
-- `AudioFileWaveform` = chunked offline waveform envelope extraction.
-- `Docs/DESIGN.md` = rendering, audio, interaction and performance specifications.
+## Run the demo
 
-> **Validation status:** `swift build` and `swift test` pass on macOS (Swift 6.2 toolchain, macOS 14 destination). The iOS demo `.xcodeproj` and microphone/file input paths have not been exercised on a simulator or device in CI — run them in Xcode before shipping a production release.
+1. Open `Demo/AudioVisualKitDemo.xcodeproj` in Xcode.
+2. Choose a simulator or iPhone and select your own development team if signing is required.
+3. Select **Gallery** to browse grouped cards, **Minimal** for the full 24-style animation wall, or **Studio** to tune a chosen effect.
+4. Demo signal runs without microphone permission. Microphone mode needs a compatible device and permission. Audio File imports a user-selected local audio file.
+
+<img src="Docs/Assets/studio-concept.png" width="300" alt="Studio layout concept">
+
+*Studio design concept. The real interface is rendered by SwiftUI; its appearance may differ.*
+
+To create a GIF from a **real** simulator/device screen recording:
+
+```bash
+brew install ffmpeg
+bash Scripts/make-gif.sh /path/to/Minimal.mov Docs/Assets/minimal-preview.gif
+```
+
+Do not present the designed concept image as evidence of tested runtime rendering.
+
+## API overview
+
+| API | Purpose |
+| --- | --- |
+| `AudioFrame(amplitude:peak:levels:spectrum:timestamp:)` | Normalized, immutable data snapshot, all values clamped to 0–1 |
+| `AudioVisualizationStyle.allCases` | All 24 styles; `title`, `group`, `isNew` metadata |
+| `AudioVisualizer(style:frame:color:secondaryColor:density:)` | Stateless SwiftUI renderer |
+| `DemoAudioSignal.frame(at:count:)` | Deterministic preview data |
+| `AudioCaptureController` | Optional iOS AVAudioEngine input adapter |
+| `AudioFileWaveform.amplitudes(url:sampleCount:)` | Offline waveform-envelope extraction |
+
+## Architecture & validation
+
+[Design and constraints](Docs/DESIGN.md) · [Recipes](Docs/RECIPES.md) · [Test checklist](Docs/TESTING.md) · [Changelog](CHANGELOG.md)
+
+- The presentation layer runs in SwiftUI `Canvas` and does not own timers or audio sessions.
+- Demo visuals use a deterministic synthetic signal; audio-reactive does **not** imply microphone access.
+- The sample microphone FFT and its allocations must be profiled using Instruments before production use.
+- `30 FPS TARGET` is a scheduling target, not a measured performance guarantee.
+- Only source syntax, Swift package manifest, and Xcode project structure can be checked in the current build environment. See [TESTING](Docs/TESTING.md) for device acceptance.
+
+## Contributing and security
+
+Pull requests welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md). This repository intentionally contains **no GitHub Actions workflow**.
 
 ## License
 
-MIT. Copyright (c) 2026 AudioVisualKit contributors.
-
-## Export a real GIF for GitHub
-
-The **Minimal** screen is specifically arranged for a compact 16-effect recording. Record it from your iOS Simulator via Xcode, then run:
-
-```bash
-./Scripts/make-gif.sh minimal-demo.mov Docs/minimal-preview.gif
-```
-
-The script uses FFmpeg (installed via `brew install ffmpeg` if needed). This outputs an actual Demo recording, not a concept animation.
+[MIT](LICENSE). Art and icons bundled in this repository may be redistributed under the same license by this project's contributors; please confirm provenance/rights before replacing them with third-party assets.

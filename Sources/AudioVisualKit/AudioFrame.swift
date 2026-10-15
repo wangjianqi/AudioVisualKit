@@ -34,6 +34,8 @@ public enum AudioVisualizationStyle: String, CaseIterable, Identifiable, Sendabl
     case sineWave, layeredWaves, siriFlow, ribbon
     case spectrum, mirroredSpectrum, radialSpectrum
     case radialWave, pulseRings, energyOrb, particles
+    case oscilloscope, doubleHelix, auroraCurtain, neonRibbon
+    case starburst, orbitingArcs, lotus, vortex
 
     public var id: String { rawValue }
 
@@ -55,14 +57,31 @@ public enum AudioVisualizationStyle: String, CaseIterable, Identifiable, Sendabl
         case .pulseRings: "Pulse Rings"
         case .energyOrb: "Energy Orb"
         case .particles: "Particles"
+        case .oscilloscope: "Oscilloscope"
+        case .doubleHelix: "Double Helix"
+        case .auroraCurtain: "Aurora Curtain"
+        case .neonRibbon: "Neon Ribbon"
+        case .starburst: "Starburst"
+        case .orbitingArcs: "Orbiting Arcs"
+        case .lotus: "Lotus"
+        case .vortex: "Vortex"
+        }
+    }
+
+    /// True for the eight additional styles introduced in the expanded gallery.
+    public var isNew: Bool {
+        switch self {
+        case .oscilloscope, .doubleHelix, .auroraCurtain, .neonRibbon,
+             .starburst, .orbitingArcs, .lotus, .vortex: true
+        default: false
         }
     }
 
     public var group: String {
         switch self {
-        case .bars, .mirroredBars, .capsuleBars, .dotWave, .recordingHistory: "Waveforms"
-        case .sineWave, .layeredWaves, .siriFlow, .ribbon: "Flow"
-        case .spectrum, .mirroredSpectrum, .radialSpectrum: "Spectrum"
+        case .bars, .mirroredBars, .capsuleBars, .dotWave, .recordingHistory, .oscilloscope: "Waveforms"
+        case .sineWave, .layeredWaves, .siriFlow, .ribbon, .doubleHelix, .auroraCurtain, .neonRibbon: "Flow"
+        case .spectrum, .mirroredSpectrum, .radialSpectrum, .starburst: "Spectrum"
         default: "Ambient"
         }
     }

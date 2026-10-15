@@ -7,6 +7,7 @@ import Foundation
 public enum AudioCaptureError: Error {
     case permissionDenied
     case unavailableInput
+    case cancelled
 }
 
 /// Lightweight microphone adapter for the demo and consumers without another audio engine.
@@ -18,6 +19,8 @@ public final class AudioCaptureController: ObservableObject {
     @Published public private(set) var errorDescription: String?
 
     private var engine: AVAudioEngine?
+    private var startGeneration: UInt64 = 0
+    private var isStarting = false
     private var observationTask: Task<Void, Never>?
     private let buffer = MicrophoneWindow()
     private let spectrumProcessor = AudioSpectrumProcessor()
@@ -26,8 +29,14 @@ public final class AudioCaptureController: ObservableObject {
     public init() {}
 
     public func start() async throws {
-        guard !isRunning else { return }
-        guard await AVAudioApplication.requestRecordPermission() else {
+        guard !isRunning, !isStarting else { return }
+        isStarting = true
+        startGeneration &+= 1
+        let generation = startGeneration
+        defer { if generation == startGeneration { isStarting = false } }
+        let granted = await AVAudioApplication.requestRecordPermission()
+        guard generation == startGeneration else { throw AudioCaptureError.cancelled }
+        guard granted else {
             errorDescription = "Microphone permission denied"
             throw AudioCaptureError.permissionDenied
         }
@@ -50,6 +59,7 @@ public final class AudioCaptureController: ObservableObject {
             try audioEngine.start()
         } catch {
             input.removeTap(onBus: 0)
+            try? session.setActive(false, options: .notifyOthersOnDeactivation)
             throw error
         }
         engine = audioEngine
@@ -88,6 +98,8 @@ public final class AudioCaptureController: ObservableObject {
     }
 
     public func stop() {
+        startGeneration &+= 1
+        isStarting = false
         observationTask?.cancel()
         observationTask = nil
         if let engine {
