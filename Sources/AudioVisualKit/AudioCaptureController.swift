@@ -42,12 +42,19 @@ public final class AudioCaptureController: ObservableObject {
         }
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .mixWithOthers])
-        try session.setActive(true)
+        do {
+            try session.setActive(true)
+        } catch {
+            errorDescription = error.localizedDescription
+            throw error
+        }
 
         let audioEngine = AVAudioEngine()
         let input = audioEngine.inputNode
         let format = input.outputFormat(forBus: 0)
         guard format.channelCount > 0, format.sampleRate > 0 else {
+            deactivateSession()
+            errorDescription = "No usable audio input on this device"
             throw AudioCaptureError.unavailableInput
         }
         // Compatibility tap. A newer installAudioTap API exists in recent SDKs;
@@ -59,7 +66,8 @@ public final class AudioCaptureController: ObservableObject {
             try audioEngine.start()
         } catch {
             input.removeTap(onBus: 0)
-            try? session.setActive(false, options: .notifyOthersOnDeactivation)
+            deactivateSession()
+            errorDescription = error.localizedDescription
             throw error
         }
         engine = audioEngine
@@ -73,6 +81,12 @@ public final class AudioCaptureController: ObservableObject {
                 try? await Task.sleep(for: .milliseconds(33))
             }
         }
+    }
+
+    /// Releases the audio session so other apps are notified again. Safe to call
+    /// when no session was ever activated.
+    private func deactivateSession() {
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     private func publish(_ samples: [Float]) {
@@ -110,7 +124,7 @@ public final class AudioCaptureController: ObservableObject {
         isRunning = false
         frame = .silence
         history = [Float](repeating: 0, count: 64)
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        deactivateSession()
     }
 
     deinit {

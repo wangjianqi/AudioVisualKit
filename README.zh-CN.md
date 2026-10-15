@@ -3,6 +3,11 @@
 
 # AudioVisualKit
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Swift](https://img.shields.io/badge/Swift-5.9+-orange.svg)](https://swift.org)
+[![Platforms](https://img.shields.io/badge/Platforms-iOS%2017%20%7C%20macOS%2014-lightgrey.svg)](https://developer.apple.com)
+[![CI](https://github.com/wangjianqi/AudioVisualKit/actions/workflows/ci.yml/badge.svg)](https://github.com/wangjianqi/AudioVisualKit/actions/workflows/ci.yml)
+
 **24 种 SwiftUI 声音可视化效果。原生 SPM，零第三方依赖。**
 
 [English README](README.md) · [开发约定](CONTRIBUTING.md) · [测试清单](Docs/TESTING.md)
@@ -12,7 +17,7 @@
 *上图为品牌宣传素材，并非应用实际运行截图。*
 </div>
 
-> **状态声明：** 当前版本已完成源代码改动、语法解析及工程结构检查，尚未完成 iOS SDK 编译与真机性能测试，因此不能直接视为生产级稳定版本。
+> **状态声明：** 库与 Demo 已通过 macOS 编译、iOS 模拟器编译，包测试全部通过。真机录音、帧率与功耗尚未实测，详见[测试清单](Docs/TESTING.md)。
 
 ## 包含内容
 
@@ -38,7 +43,13 @@
 
 ## 使用
 
-在 Xcode 中打开 `Demo/AudioVisualKitDemo.xcodeproj`。工程通过 **本地 Swift Package** 引用根目录 `Package.swift`。如需发布到 GitHub，将仓库真实地址通过 Xcode 的 Add Package Dependencies 添加到其他项目即可。
+在其他工程中通过 **Xcode → File → Add Package Dependencies** 添加：
+
+```
+https://github.com/wangjianqi/AudioVisualKit.git
+```
+
+或在 `Package.swift` 中声明依赖（`from: "1.0.0"` 起）。本地开发可直接用 **Add Local…** 添加本目录，Demo 工程已通过本地 Swift Package 引用根目录 `Package.swift`，无需联网。
 
 ```swift
 import AudioVisualKit
@@ -59,13 +70,25 @@ AudioVisualizer(
 
 本地音频文件目前只提取振幅包络，不会自动生成实时 FFT 频谱。见 [使用示例](Docs/RECIPES.md) 和 [测试清单](Docs/TESTING.md)。
 
-## 开源发布检查
+## 运行 Demo
 
-- [ ] Xcode iOS 模拟器 Debug/Release 编译
+在 Xcode 中打开 `Demo/AudioVisualKitDemo.xcodeproj`，选择模拟器或真机（需要签名时填入自己的开发团队），即可切换 **Gallery / Minimal / Studio** 三种模式与 Demo / Microphone / Audio File 三种数据源。
+
+## 本地校验
+
+```bash
+swift build
+swift test
+```
+
+CI（GitHub Actions）在每次 push 与 PR 时执行同样命令。
+
+## 待完成验收
+
 - [ ] iPhone 真机麦克风授权、开始、停止、切后台、恢复
-- [ ] 24 种动画视觉和缩放验收
+- [ ] 24 种动画视觉与缩放验收
 - [ ] Minimal 多组件帧率、能耗和内存测试
-- [ ] 真机或模拟器录制 GIF，并替换 README 中的概念图
-- [ ] 填写真实 GitHub 仓库链接、发布版本与 Release Notes
+- [ ] 真机或模拟器录制 GIF，替换 README 中的概念图
+- [ ] 发布 Release Notes
 
-其他材料：`LICENSE`、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`、`SECURITY.md`、`CHANGELOG.md`。**没有创建 GitHub Actions。**
+其他材料：`LICENSE`、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`、`SECURITY.md`、`CHANGELOG.md`。

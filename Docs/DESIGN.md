@@ -13,6 +13,20 @@
 
 `DemoAudioSignal` is deterministic; use it for zero-permission animations and screenshot/GIF previews. Sound-reactive visualization is different from a calibrated SPL meter.
 
+## Source layout
+
+| Path | Contents |
+| --- | --- |
+| `Sources/AudioVisualKit/AudioFrame.swift` | Immutable normalized data snapshot |
+| `Sources/AudioVisualKit/AudioVisualizationStyle.swift` | 24 cases with `title`, `group`, `isNew` metadata |
+| `Sources/AudioVisualKit/DemoAudioSignal.swift` | Deterministic preview signal |
+| `Sources/AudioVisualKit/AudioVisualizer.swift` | `AudioVisualizer` view plus `AudioPainter` dispatch and shared sampling helpers |
+| `Sources/AudioVisualKit/Painters/` | One file per effect family: `WaveformPainters`, `FlowPainters`, `SpectrumPainters`, `AmbientPainters` |
+| `Sources/AudioVisualKit/AudioCaptureController.swift` | Optional iOS-only `AVAudioEngine` microphone adapter |
+| `Sources/AudioVisualKit/AudioFileWaveform.swift` | Offline envelope extraction |
+
+`AudioPainter` is `internal`: painters are plain extensions of it in the family files and stay invisible to consumers. A painter is a pure function of the frame and the view size — it owns no state and no timer.
+
 ## Visual styles
 
 | Family | Styles | Required signals |

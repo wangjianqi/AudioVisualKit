@@ -7,8 +7,12 @@ if [[ $# -lt 1 ]]; then
   echo "Usage: $0 INPUT.mov [OUTPUT.gif]" >&2
   exit 64
 fi
+if ! command -v ffmpeg >/dev/null 2>&1; then
+  echo "ffmpeg not found. Install it with: brew install ffmpeg" >&2
+  exit 69
+fi
 input="$1"
-output="${2:-Docs/minimal-preview.gif}"
+output="${2:-Docs/Assets/minimal-preview.gif}"
 mkdir -p "$(dirname "$output")"
 ffmpeg -hide_banner -loglevel error -y -i "$input" \
   -filter_complex "[0:v]fps=15,scale=800:-1:flags=lanczos,split[v1][v2];[v1]palettegen=stats_mode=diff[p];[v2][p]paletteuse=dither=bayer:bayer_scale=4" \

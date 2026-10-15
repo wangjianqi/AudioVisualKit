@@ -4,6 +4,11 @@
 
 # AudioVisualKit
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Swift](https://img.shields.io/badge/Swift-5.9+-orange.svg)](https://swift.org)
+[![Platforms](https://img.shields.io/badge/Platforms-iOS%2017%20%7C%20macOS%2014-lightgrey.svg)](https://developer.apple.com)
+[![CI](https://github.com/wangjianqi/AudioVisualKit/actions/workflows/ci.yml/badge.svg)](https://github.com/wangjianqi/AudioVisualKit/actions/workflows/ci.yml)
+
 **24 audio-reactive SwiftUI visualizations. One Swift Package. No external dependencies.**
 
 A reusable audio visualization toolkit for voice interfaces, recorders, music players, and interactive experiences.
@@ -16,7 +21,7 @@ A reusable audio visualization toolkit for voice interfaces, recorders, music pl
 
 </div>
 
-> **Development status:** This repository is an open-source starter and design implementation, not yet a device-validated release. Source syntax and project structure have been checked, but building the iOS target and performance testing on device are still required.
+> **Development status:** The library and the bundled Demo compile on macOS and for iOS Simulator, and the package test suite passes. Real-device audio capture, frame pacing and power measurements are still outstanding — see [TESTING](Docs/TESTING.md) for what is verified and what is not.
 
 ## Features
 
@@ -37,15 +42,27 @@ A reusable audio visualization toolkit for voice interfaces, recorders, music pl
 | Spectrum (4) | Spectrum, Mirrored Spectrum, Radial Spectrum, **Starburst** |
 | Ambient (7) | Radial Wave, Pulse Rings, Energy Orb, Particles, **Orbiting Arcs**, **Lotus**, **Vortex** |
 
-**Bold names** are the 8 styles added in this revision. All 16 original styles remain available with unchanged case names.
+**Bold names** are the 8 styles added after the initial 16. All 16 original styles remain available with unchanged case names.
 
 ## Getting started
 
 ### Swift Package Manager
 
-After pushing your fork or publishing this package to GitHub, use **Xcode → File → Add Package Dependencies**, enter *your repository's actual URL*, select a version, and `import AudioVisualKit`.
+In Xcode use **File → Add Package Dependencies** and enter:
 
-For local development, add this package using **Add Local…** from Xcode. No remote repository URL is required for the included Demo.
+```
+https://github.com/wangjianqi/AudioVisualKit.git
+```
+
+Or add it to your own `Package.swift`:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/wangjianqi/AudioVisualKit.git", from: "1.0.0")
+]
+```
+
+Then `import AudioVisualKit`. For local development, add this package with **Add Local…** from Xcode — the included Demo already references the package locally, so no network access is required to build it.
 
 ### One visualizer
 
@@ -110,10 +127,10 @@ To create a GIF from a **real** simulator/device screen recording:
 
 ```bash
 brew install ffmpeg
-bash Scripts/make-gif.sh /path/to/Minimal.mov Docs/Assets/minimal-preview.gif
+bash Scripts/make-gif.sh /path/to/Minimal.mov
 ```
 
-Do not present the designed concept image as evidence of tested runtime rendering.
+The script writes `Docs/Assets/minimal-preview.gif` by default; pass a second argument to change the output path. No preview GIF is committed yet — record one on a real device before using it as release artwork. Do not present the designed concept image as evidence of tested runtime rendering.
 
 ## API overview
 
@@ -134,11 +151,18 @@ Do not present the designed concept image as evidence of tested runtime renderin
 - Demo visuals use a deterministic synthetic signal; audio-reactive does **not** imply microphone access.
 - The sample microphone FFT and its allocations must be profiled using Instruments before production use.
 - `30 FPS TARGET` is a scheduling target, not a measured performance guarantee.
-- Only source syntax, Swift package manifest, and Xcode project structure can be checked in the current build environment. See [TESTING](Docs/TESTING.md) for device acceptance.
+- **Verified in CI and locally:** `swift build` and `swift test` (5 tests) on macOS, and an Xcode Debug build of the Demo for iOS Simulator. **Not yet verified:** physical-device audio capture, frame pacing, energy and memory. See [TESTING](Docs/TESTING.md).
 
 ## Contributing and security
 
-Pull requests welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md). This repository intentionally contains **no GitHub Actions workflow**.
+Pull requests welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md).
+
+The package test suite runs in GitHub Actions on every push and pull request:
+
+```bash
+swift build
+swift test
+```
 
 ## License
 
