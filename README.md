@@ -19,6 +19,10 @@ A reusable audio visualization toolkit for voice interfaces, recorders, music pl
 
 *Brand artwork (not a screenshot of the running application).*
 
+<img src="Docs/Assets/demo.gif" width="380" alt="Real device recording of AudioVisualKit demo effects">
+
+*Real device recording. Watch the full demo video [here](Docs/demo.mp4).*
+
 </div>
 
 > **V3 status:** The updated source passes syntax checks and Foundation-model type-checking. The V3 package and Demo have **not** yet been rebuilt in Xcode or validated on an iOS device. See [QA REPORT](Docs/QA_REPORT.md).
@@ -138,7 +142,7 @@ brew install ffmpeg
 bash Scripts/make-gif.sh /path/to/Minimal.mov
 ```
 
-The script writes `Docs/Assets/minimal-preview.gif` by default; pass a second argument to change the output path. No preview GIF is committed yet — record one on a real device before using it as release artwork. Do not present the designed concept image as evidence of tested runtime rendering.
+The script writes `Docs/Assets/minimal-preview.gif` by default; pass a second argument to change the output path. It picks a narrower output for portrait phone captures automatically. The committed `Docs/Assets/demo.gif` was produced with this script from a real device recording (full video: [Docs/demo.mp4](Docs/demo.mp4)); record a fresh GIF the same way whenever the interface changes. Do not present the designed concept image as evidence of tested runtime rendering.
 
 ## API overview
 

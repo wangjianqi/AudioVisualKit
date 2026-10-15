@@ -14,7 +14,14 @@ fi
 input="$1"
 output="${2:-Docs/Assets/minimal-preview.gif}"
 mkdir -p "$(dirname "$output")"
+# Pick a display width suited to the capture orientation (phone recordings are portrait).
+width=800
+dims="$(ffmpeg -hide_banner -i "$input" 2>&1 | grep -m1 'Video:' | grep -oE '[0-9]{3,5}x[0-9]{3,5}' | head -n1 || true)"
+if [[ "$dims" == *x* ]]; then
+  w="${dims%x*}"; h="${dims#*x}"
+  if (( h > w )); then width=400; fi
+fi
 ffmpeg -hide_banner -loglevel error -y -i "$input" \
-  -filter_complex "[0:v]fps=15,scale=800:-1:flags=lanczos,split[v1][v2];[v1]palettegen=stats_mode=diff[p];[v2][p]paletteuse=dither=bayer:bayer_scale=4" \
+  -filter_complex "[0:v]fps=15,scale=${width}:-2:flags=lanczos,split[v1][v2];[v1]palettegen=stats_mode=diff[p];[v2][p]paletteuse=dither=bayer:bayer_scale=4" \
   -loop 0 "$output"
 printf 'Created: %s\n' "$output"

@@ -15,6 +15,11 @@
 <img src="Docs/Assets/hero.png" alt="音频可视化项目品牌宣传图">
 
 *上图为品牌宣传素材，并非应用实际运行截图。*
+
+<img src="Docs/Assets/demo.gif" width="380" alt="AudioVisualKit 真机运行录屏">
+
+*真机运行录屏。完整演示视频见 [Docs/demo.mp4](Docs/demo.mp4)。*
+
 </div>
 
 > **V3 状态：** 已完成语法检查和 Foundation 模型类型检查。V3 新代码尚未通过 Xcode/iOS SDK 编译和真机验收，不能将旧版的测试结果视为新版结果。详见[QA 报告](Docs/QA_REPORT.md)。
@@ -88,7 +93,7 @@ swift test
 - [ ] iPhone 真机麦克风授权、开始、停止、切后台、恢复
 - [ ] 24 种动画视觉与缩放验收
 - [ ] Minimal 多组件帧率、能耗和内存测试
-- [ ] 真机或模拟器录制 GIF，替换 README 中的概念图
+- [x] 真机录制演示视频并转制 README 内联 GIF（`Docs/Assets/demo.gif`，完整视频 `Docs/demo.mp4`）
 - [ ] 发布 Release Notes
 
 其他材料：`LICENSE`、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`、`SECURITY.md`、`CHANGELOG.md`。
