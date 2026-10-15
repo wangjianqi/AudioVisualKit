@@ -465,7 +465,12 @@ struct DemoHomeView: View {
             if let player = audioPlayer {
                 HStack {
                     Button {
-                        if player.isPlaying { player.pause() } else { player.play() }
+                        if player.isPlaying {
+                            player.pause()
+                        } else {
+                            ensurePlaybackSession()
+                            player.play()
+                        }
                     } label: {
                         Label(player.isPlaying ? "Pause" : "Play",
                               systemImage: player.isPlaying ? "pause.fill" : "play.fill")
@@ -549,6 +554,23 @@ struct DemoHomeView: View {
         }
     }
 
+    /// File playback relies on AVAudioPlayer, which reads the shared audio session.
+    /// Without this, playback uses the default .soloAmbient category (muted by the
+    /// ring/silent switch) and inherits any leftover .playAndRecord/.measurement
+    /// category from the microphone path, both of which silence the imported file.
+    /// Setting .playback overrides that state and routes audio to the loud speaker.
+    private func ensurePlaybackSession() {
+        #if os(iOS)
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playback, mode: .default)
+            try session.setActive(true)
+        } catch {
+            importError = error.localizedDescription
+        }
+        #endif
+    }
+
     /// All expensive security-scoped copying and FFT decoding happens in a worker.
     /// Generation checks prevent a slower earlier file from overwriting a newer import.
     private func importAudio(_ url: URL) {
@@ -572,6 +594,7 @@ struct DemoHomeView: View {
                     return
                 }
                 let player = try AVAudioPlayer(contentsOf: prepared.url)
+                ensurePlaybackSession()
                 player.prepareToPlay()
                 audioPlayer?.stop()
                 if let importedTempURL { try? FileManager.default.removeItem(at: importedTempURL) }
